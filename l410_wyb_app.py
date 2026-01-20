@@ -3,9 +3,12 @@
 This script is a direct Python conversion of the provided Excel template
 "Copia de WYB LET.xlsx" (aircraft HK 4895), focusing on the math and checks.
 
-How to run (recommended):
+How to run (VS Code / CLI):
+  python l410_wyb_app.py --use-defaults
+
+Optional Streamlit UI:
   pip install streamlit matplotlib
-  streamlit run l410_wyb_app.py
+  streamlit run l410_wyb_app.py -- --streamlit
 
 You can also import and call `compute(inputs)` for programmatic use.
 
@@ -27,8 +30,10 @@ Notes
 
 from __future__ import annotations
 
+import argparse
+import json
 from dataclasses import dataclass
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 # -------- Constants (from the spreadsheet) --------
 
@@ -376,14 +381,40 @@ def _run_streamlit() -> None:
     st.caption("⚠️ Este script replica la lógica del Excel. Verifica siempre con tus procedimientos/limitaciones operacionales.")
 
 
-if __name__ == "__main__":
-    # If run via `python l410_wyb_app.py`, fall back to a tiny console printout.
-    try:
-        import streamlit  # noqa: F401
+def _run_cli() -> None:
+    parser = argparse.ArgumentParser(
+        description="L-410 Weight & Balance calculator (CLI).",
+    )
+    parser.add_argument(
+        "--streamlit",
+        action="store_true",
+        help="Launch the Streamlit UI instead of the CLI output.",
+    )
+    parser.add_argument(
+        "--payload",
+        type=str,
+        default="",
+        help="JSON object for payload by station name (e.g. '{\"Crew Seat\": 160}').",
+    )
+    parser.add_argument("--empty-weight", type=float, default=DEFAULT_EMPTY_WEIGHT)
+    parser.add_argument("--empty-arm", type=float, default=DEFAULT_EMPTY_ARM)
+    parser.add_argument("--wing-tip-fuel", type=float, default=0.0)
+    parser.add_argument("--main-fuel", type=float, default=700.0)
+    parser.add_argument("--taxi-fuel", type=float, default=-20.0)
+    parser.add_argument("--basic-fuel", type=float, default=600.0)
+    parser.add_argument(
+        "--use-defaults",
+        action="store_true",
+        help="Use the spreadsheet default payload values.",
+    )
+    args = parser.parse_args()
+
+    if args.streamlit:
         _run_streamlit()
-    except Exception:
-        # Console mode
-        default_payload = {
+        return
+
+    if args.use_defaults:
+        payload_values = {
             "Forward Baggage": 100,
             "Crew Seat": 160,
             "Seat Row 1": 240,
@@ -395,6 +426,24 @@ if __name__ == "__main__":
             "Seat Row 7": 140,
             "Aft Baggage": 0,
         }
-        res = compute(Inputs(payload=default_payload))
-        print("Takeoff:", res["takeoff"])
-        print("Landing:", res["landing"])
+    elif args.payload:
+        payload_values = json.loads(args.payload)
+    else:
+        payload_values = {name: 0.0 for name, _ in STATIONS}
+
+    inputs = Inputs(
+        payload=payload_values,
+        empty_weight=args.empty_weight,
+        empty_arm=args.empty_arm,
+        wing_tip_fuel=args.wing_tip_fuel,
+        main_fuel=args.main_fuel,
+        taxi_fuel=args.taxi_fuel,
+        basic_fuel=args.basic_fuel,
+    )
+    res = compute(inputs)
+    print(json.dumps(res, indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    # If run via `python l410_wyb_app.py`, default to CLI for VS Code usage.
+    _run_cli()
