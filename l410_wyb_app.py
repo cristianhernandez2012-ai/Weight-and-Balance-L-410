@@ -3,12 +3,15 @@
 This script is a direct Python conversion of the provided Excel template
 "Copia de WYB LET.xlsx" (aircraft HK 4895), focusing on the math and checks.
 
-How to run (VS Code / CLI):
-  python l410_wyb_app.py --use-defaults
-
-Optional Streamlit UI:
+Visual UI (Streamlit):
   pip install streamlit matplotlib
   streamlit run l410_wyb_app.py -- --streamlit
+
+Visual UI (launch via Python):
+  python l410_wyb_app.py --visual
+
+CLI (for VS Code / scripts):
+  python l410_wyb_app.py --cli --use-defaults
 
 You can also import and call `compute(inputs)` for programmatic use.
 
@@ -32,6 +35,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import sys
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
@@ -385,10 +390,18 @@ def _run_cli() -> None:
     parser = argparse.ArgumentParser(
         description="L-410 Weight & Balance calculator (CLI).",
     )
-    parser.add_argument(
-        "--streamlit",
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--cli",
         action="store_true",
-        help="Launch the Streamlit UI instead of the CLI output.",
+        help="Force CLI JSON output mode.",
+    )
+    mode_group.add_argument(
+        "--visual",
+        "--streamlit",
+        dest="visual",
+        action="store_true",
+        help="Launch the Streamlit UI (alias: --streamlit).",
     )
     parser.add_argument(
         "--payload",
@@ -409,8 +422,14 @@ def _run_cli() -> None:
     )
     args = parser.parse_args()
 
-    if args.streamlit:
-        _run_streamlit()
+    if args.visual:
+        if "--streamlit" in sys.argv:
+            _run_streamlit()
+            return
+        subprocess.run(
+            ["streamlit", "run", __file__, "--", "--streamlit"],
+            check=False,
+        )
         return
 
     if args.use_defaults:
@@ -445,5 +464,5 @@ def _run_cli() -> None:
 
 
 if __name__ == "__main__":
-    # If run via `python l410_wyb_app.py`, default to CLI for VS Code usage.
+    # If run via `python l410_wyb_app.py`, default to CLI unless --visual/--streamlit is passed.
     _run_cli()
